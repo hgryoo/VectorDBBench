@@ -82,6 +82,8 @@ weaviate        = [ "weaviate-client" ]
 elastic         = [ "elasticsearch" ]
 # For elastic and aliyun_elasticsearch
 
+cubrid          = [ "CUBRIDdb" ]
+
 pgvector        = [ "psycopg", "psycopg-binary", "pgvector" ]
 # for pgvector, pgvectorscale, pgdiskann, and, alloydb
 
