@@ -9,6 +9,7 @@ from ....cli.cli import (
     CommonTypedDict,
     cli,
     click_parameter_decorators_from_typed_dict,
+    get_custom_case_config,
     run,
 )
 
@@ -16,12 +17,7 @@ from ....cli.cli import (
 class CubridTypedDict(CommonTypedDict):
     user_name: Annotated[
         str,
-        click.option(
-            "--username",
-            type=str,
-            help="Username",
-            required=True,
-        ),
+        click.option("--user-name", type=str, help="Db username", required=True),
     ]
     password: Annotated[
         str,
@@ -29,30 +25,23 @@ class CubridTypedDict(CommonTypedDict):
             "--password",
             type=str,
             help="Password",
-            required=True,
+            required=False,
         ),
     ]
 
-    host: Annotated[
-        str,
-        click.option(
-            "--host",
-            type=str,
-            help="Db host",
-            default="127.0.0.1",
-        ),
-    ]
-
+    host: Annotated[str, click.option("--host", type=str, help="Db host", required=True)]
     port: Annotated[
         int,
         click.option(
             "--port",
             type=int,
-            default=33000,
-            help="Db Port",
+            help="Postgres database port",
+            default=5432,
+            show_default=True,
+            required=False,
         ),
     ]
-
+    db_name: Annotated[str, click.option("--db-name", type=str, help="Db name", required=True)]
 
 class CubridHNSWTypedDict(CubridTypedDict):
     m: Annotated[
@@ -61,6 +50,16 @@ class CubridHNSWTypedDict(CubridTypedDict):
             "--m",
             type=int,
             help="M parameter in MHNSW vector indexing",
+            required=False,
+        ),
+    ]
+
+    ef_construction: Annotated[
+        int | None,
+        click.option(
+            "--ef-construction",
+            type=int,
+            help="Cubrid system variable mhnsw_min_limit",
             required=False,
         ),
     ]
@@ -82,17 +81,20 @@ def CubridHNSW(
 ):
     from .config import CubridConfig, CubridHNSWConfig
 
+    parameters["custom_case"] = get_custom_case_config(parameters)
     run(
         db=DB.Cubrid,
         db_config=CubridConfig(
             db_label=parameters["db_label"],
-            user_name=parameters["username"],
+            user_name=parameters["user_name"],
             password=SecretStr(parameters["password"]),
             host=parameters["host"],
             port=parameters["port"],
+            db_name=parameters["db_name"],
         ),
         db_case_config=CubridHNSWConfig(
-            M=parameters["m"],
+            m=parameters["m"],
+            ef_construction=parameters["ef_construction"],
             ef_search=parameters["ef_search"],
         ),
         **parameters,

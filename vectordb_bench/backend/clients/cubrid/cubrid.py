@@ -37,7 +37,8 @@ class Cubrid(VectorDB):
         self.dim = dim
 
         # construct basic units
-        self.conn, self.cursor = self._create_connection(**self.db_config)
+        print(self.db_config)
+        self.conn, self.cursor = self._create_connection(self.db_config)
 
         if drop_old:
             self._drop_table()
@@ -50,13 +51,14 @@ class Cubrid(VectorDB):
         self.new_init = False
 
     @staticmethod
-    def _create_connection(**kwargs) -> tuple[CUBRIDdb.Connection, CUBRIDdb.Cursor]:
-        conn = CUBRIDdb.connect(**kwargs)
-        cursor = conn.cursor()
-
+    def _create_connection(db_config: CubridConfigDict):
+        # url:    # 'CUBRID:localhost:33000:demodb:::', 'dba', ''    
+        url = f"CUBRID:{db_config["host"]}:{db_config["port"]}:{db_config["dbname"]}:::"
+        print(url)
+        conn = CUBRIDdb.connect(url, db_config["user"], db_config["password"])
         assert conn is not None, "Connection is not initialized"
+        cursor = conn.cursor()
         assert cursor is not None, "Cursor is not initialized"
-
         return conn, cursor
 
     def _drop_table(self):
@@ -80,18 +82,13 @@ class Cubrid(VectorDB):
                 f"""
                 CREATE TABLE {self.table_name} (
                     id BIGINT PRIMARY KEY,
-                    embedding VECTOR({self.dim}) NOT NULL
+                    embedding VECTOR({dim}) NOT NULL
                 )
                 """
             )
             idx_stmt = (
-                "CREATE VECTOR INDEX idx_v ON %s(embedding %s) "
-                "WITH (m = %d, ef_construction = %d);" % (
-                    self.table_name,
-                    METRIC_PROPERTIES[index_param["metric_type"]]["ops_type"],
-                    index_param["M"],
-                    index_param["ef_search"]
-                )
+                f"CREATE VECTOR INDEX idx_v ON {self.table_name}(embedding {index_param['metric']}) "
+                f"WITH (m = {index_param['m']}, ef_construction = {index_param['ef_construction']});"
             )
             self.cursor.execute(idx_stmt)
             self.conn.commit()
@@ -108,21 +105,21 @@ class Cubrid(VectorDB):
             >>> with self.init():
             >>>     self.insert_embeddings()
         """
-        self.conn, self.cursor = self._create_connection(**self.db_config)
+        self.conn, self.cursor = self._create_connection(self.db_config)
 
         search_param = self.case_config.search_param()
 
         self.cursor.execute(f"SET SYSTEM PARAMETERS 'hnsw_ef_search = {search_param['ef_search']}'")
         self.cursor.execute("COMMIT")
 
-        self.insert_sql = f"INSERT INTO {self.table_name} (id, embedding) VALUES (%s, %s)"
+        self.insert_sql = f"INSERT INTO {self.table_name} (id, embedding) VALUES (?, ?)"
         self.select_sql = (
             f"SELECT id FROM {self.table_name}"
-            f"ORDER BY embedding {search_param['metric_type']} %s LIMIT %d"
+            f"ORDER BY embedding {search_param['metric_fun_op']} ? LIMIT %d"
         )
         self.select_sql_with_filter = (
-            f"SELECT id FROM {self.table_name} WHERE id >= %d "
-            f"ORDER BY embedding {search_param['metric_type']} %s LIMIT %d"
+            f"SELECT id FROM {self.table_name} WHERE id >= ? "
+            f"ORDER BY embedding {search_param['metric_fun_op']} ? LIMIT %d"
         )
 
         self.new_init = True
@@ -164,7 +161,11 @@ class Cubrid(VectorDB):
             for i, row in enumerate(metadata_arr):
                 batch_data.append((int(row), "[" + ",".join(map(str, embeddings_arr[i])) + "]"))
 
-            self.cursor.executemany(self.insert_sql, batch_data)
+            self.cursor._cs.prepare(self.insert_sql)
+            for args in batch_data:
+                self.cursor._bind_params(args, None)
+                self.cursor._cs.execute()
+
             self.cursor.execute("COMMIT")
 
             return len(metadata), None
@@ -185,25 +186,25 @@ class Cubrid(VectorDB):
 
         vector_str = "[" + ",".join(map(str, query)) + "]"
 
+
         if self.new_init:
             if filters:
-                self.cursor._cs.prepare(self.select_sql_with_filter)
+                sql = self.select_sql_with_filter.format(k)
+                self.cursor._cs.prepare(sql)
             else:
-                self.cursor._cs.prepare(self.select_sql)
+                sql = self.select_sql.format(k)
+                self.cursor._cs.prepare(sql)
             self.new_init = False
 
         set_type = None
         if filters:
-            args = (filters.get("id"), vector_str, k)
-            self.cursor._bind_params(args, set_type)
-            r = self.cursor._cs.execute()
-            self.cursor.rowcount = self.cursor._cs.rowcount
-            self.cursor.description = self.cursor._cs.description
+            args = (filters.get("id"), vector_str)
         else:
-            args = (vector_str, k)
-            self.cursor._bind_params(args, set_type)
-            r = self.cursor._cs.execute()
-            self.cursor.rowcount = self.cursor._cs.rowcount
-            self.cursor.description = self.cursor._cs.description
+            args = (vector_str)
+
+        self.cursor._bind_params(args, set_type)
+        r = self.cursor._cs.execute()
+        self.cursor.rowcount = self.cursor._cs.rowcount
+        self.cursor.description = self.cursor._cs.description
 
         return [id for (id,) in self.cursor.fetchall()]

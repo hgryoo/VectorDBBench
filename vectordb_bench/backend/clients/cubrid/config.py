@@ -18,7 +18,7 @@ class CubridConfigDict(TypedDict):
 class CubridConfig(DBConfig):
     user_name: str = "dba"
     password: SecretStr
-    host: str = "127.0.0.1"
+    host: str = "localhost"
     port: int = 33000
     db_name: str = "ann"
 
@@ -33,7 +33,7 @@ class CubridConfig(DBConfig):
         }
 
 
-class CubridIndexConfig(BaseModel):
+class CubridIndexConfig(BaseModel, DBCaseConfig):
     """Base config for Cubrid"""
 
     metric_type: MetricType | None = None
@@ -46,22 +46,33 @@ class CubridIndexConfig(BaseModel):
         msg = f"Metric type {self.metric_type} is not supported!"
         raise ValueError(msg)
 
+    def parse_metric_fun_op(self) -> str:
+        if self.metric_type == MetricType.L2:
+            return "<->"
+        if self.metric_type == MetricType.IP:
+            return "<#>"
+        if self.metric_type == MetricType.COSINE:
+            return "<c>"
+        return "<>"
 
-class CubridHNSWConfig(CubridIndexConfig, DBCaseConfig):
-    M: int | None
+class CubridHNSWConfig(CubridIndexConfig):
+    
+    m: int | None
+    ef_construction: int | None
     ef_search: int | None
     index: IndexType = IndexType.HNSW
 
     def index_param(self) -> dict:
         return {
-            "metric_type": self.parse_metric(),
+            "metric": self.parse_metric(),
             "index_type": self.index.value,
-            "M": self.M,
+            "m": self.m,
+            "ef_construction": self.ef_construction,
         }
 
     def search_param(self) -> dict:
         return {
-            "metric_type": self.parse_metric(),
+            "metric_fun_op": self.parse_metric_fun_op(),
             "ef_search": self.ef_search,
         }
 

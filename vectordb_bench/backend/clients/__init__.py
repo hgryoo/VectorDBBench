@@ -1,5 +1,7 @@
 from enum import Enum
 
+from vectordb_bench.backend.clients.cubrid.config import CubridIndexConfig
+
 from .api import (
     DBCaseConfig,
     DBConfig,
@@ -32,6 +34,7 @@ class DB(Enum):
     PgVector = "PgVector"
     PgVectoRS = "PgVectoRS"
     PgVectorScale = "PgVectorScale"
+    Cubrid = "CUBRID"
     PgDiskANN = "PgDiskANN"
     AlloyDB = "AlloyDB"
     Redis = "Redis"
@@ -88,6 +91,11 @@ class DB(Enum):
             from .weaviate_cloud.weaviate_cloud import WeaviateCloud
 
             return WeaviateCloud
+
+        if self == DB.Cubrid:
+            from .cubrid.cubrid import Cubrid
+
+            return Cubrid
 
         if self == DB.PgVector:
             from .pgvector.pgvector import PgVector
@@ -235,6 +243,11 @@ class DB(Enum):
 
             return WeaviateConfig
 
+        if self == DB.Cubrid:
+            from .cubrid.config import CubridConfig
+
+            return CubridConfig
+
         if self == DB.PgVector:
             from .pgvector.config import PgVectorConfig
 
@@ -376,6 +389,11 @@ class DB(Enum):
             from .weaviate_cloud.config import WeaviateIndexConfig
 
             return WeaviateIndexConfig
+
+        if self == DB.Cubrid:
+            from .cubrid.config import _Cubrid_case_config
+
+            return _Cubrid_case_config.get(index_type)
 
         if self == DB.PgVector:
             from .pgvector.config import _pgvector_case_config

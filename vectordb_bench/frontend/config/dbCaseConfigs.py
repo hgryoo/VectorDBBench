@@ -523,6 +523,15 @@ CaseConfigParamInput_query_rescore = CaseConfigInput(
     isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.STREAMING_DISKANN.value,
 )
 
+CaseConfigParamInput_IndexType_CUBRID = CaseConfigInput(
+    label=CaseConfigParamType.IndexType,
+    inputHelp="Select Index Type",
+    inputType=InputType.Option,
+    inputConfig={
+        "options": [IndexType.HNSW.value],
+    },
+)
+
 CaseConfigParamInput_IndexType_PgVector = CaseConfigInput(
     label=CaseConfigParamType.IndexType,
     inputHelp="Select Index Type",
@@ -1632,6 +1641,28 @@ CaseConfigParamInput_REFRESH_INTERVAL_AWSOpensearch = CaseConfigInput(
     inputConfig={"value": "60s", "placeholder": "e.g. 30s, 1m"},
 )
 
+CaseConfigParamInput_EFConstruction_CUBRID = CaseConfigInput(
+    label=CaseConfigParamType.ef_construction,
+    inputType=InputType.Number,
+    inputConfig={
+        "min": 8,
+        "max": 1024,
+        "value": 256,
+    },
+    isDisplayed=lambda config: config[CaseConfigParamType.IndexType] == IndexType.HNSW.value,
+)
+
+CaseConfigParamInput_EFSearch_CUBRID = CaseConfigInput(
+    label=CaseConfigParamType.ef_search,
+    inputType=InputType.Number,
+    inputConfig={
+        "min": 1,
+        "max": 2048,
+        "value": 256,
+    },
+    isDisplayed=lambda config: config.get(CaseConfigParamType.IndexType, None) == IndexType.HNSW.value,
+)
+
 MilvusLoadConfig = [
     CaseConfigParamInput_IndexType,
     CaseConfigParamInput_M,
@@ -1722,6 +1753,19 @@ AWSOpenSearchPerformanceConfig = [
 AliyunOpensearchLoadingConfig = []
 AliyunOpenSearchPerformanceConfig = [
     CaseConfigParamInput_EF_SEARCH_AliyunOpensearch,
+]
+
+CUBRIDLoadingConfig = [
+    CaseConfigParamInput_IndexType_CUBRID,
+    CaseConfigParamInput_m,
+    CaseConfigParamInput_EFConstruction_CUBRID,
+]
+
+CUBRIDPerformanceConfig = [
+    CaseConfigParamInput_IndexType_CUBRID,
+    CaseConfigParamInput_m,
+    CaseConfigParamInput_EFConstruction_CUBRID,
+    CaseConfigParamInput_EFSearch_CUBRID,
 ]
 
 PgVectorLoadingConfig = [
@@ -2047,6 +2091,10 @@ CASE_CONFIG_MAP = {
     DB.OSSOpenSearch: {
         CaseLabel.Load: AWSOpensearchLoadingConfig,
         CaseLabel.Performance: AWSOpenSearchPerformanceConfig,
+    },
+    DB.Cubrid: {
+        CaseLabel.Load: CUBRIDLoadingConfig,
+        CaseLabel.Performance: CUBRIDPerformanceConfig,
     },
     DB.PgVector: {
         CaseLabel.Load: PgVectorLoadingConfig,
